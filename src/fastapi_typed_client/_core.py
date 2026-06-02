@@ -46,6 +46,7 @@ def generate_fastapi_typed_client(
     import_client_base: bool = False,
     raise_if_not_default_status: bool = False,
     include_security_params: bool = True,
+    kwonly_args: bool = False,
     _add_test_markers: bool = False,
 ) -> None:
     app = (
@@ -83,6 +84,7 @@ def generate_fastapi_typed_client(
         import_barrier,
         import_client_base,
         raise_if_not_default_status,
+        kwonly_args,
         _add_test_markers,
     ).generate(routes)
 

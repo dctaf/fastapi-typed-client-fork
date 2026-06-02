@@ -84,6 +84,7 @@ class ClientCodeGenerator:
         import_barriers: Iterable[str],
         import_client_base: bool,
         raise_if_not_default_status: bool,
+        kwonly_args: bool,
         add_test_markers: bool,
     ) -> None:
         self._title = title
@@ -91,6 +92,7 @@ class ClientCodeGenerator:
         self._base_class = FastAPIClientBase if not async_ else FastAPIClientAsyncBase
         self._import_client_base = import_client_base
         self._raise_if_not_default_status = raise_if_not_default_status
+        self._kwonly_args = kwonly_args
         self._add_test_markers = add_test_markers
         self._impr = ImportRegistry()
         for import_barrier in import_barriers:
@@ -183,8 +185,17 @@ class ClientCodeGenerator:
         return (
             f"{'async ' if self._async else ''}def {route.name}(\n"
             + "    self,\n"
+            # When enabled, the `*` immediately after `self` makes every route-specific
+            # parameter keyword-only, which keeps generated call sites self-documenting.
+            # The generic params then skip their own delimiter to avoid a duplicate `*`.
+            + ("    *,\n" if self._kwonly_args else "")
             + indent(self._get_route_specific_params_code(route.params))
-            + indent(self._get_route_generic_params_code(raise_if_not_default_status))
+            + indent(
+                self._get_route_generic_params_code(
+                    raise_if_not_default_status,
+                    omit_delimiter=self._kwonly_args,
+                )
+            )
             + ") -> "
             + self._get_route_responses_code(responses, route.streaming_kind)
         )
@@ -213,14 +224,16 @@ class ClientCodeGenerator:
         return self._idents.file
 
     def _get_route_generic_params_code(
-        self, raise_if_not_default_status: bool | None
+        self, raise_if_not_default_status: bool | None, *, omit_delimiter: bool = False
     ) -> str:
         raise_if_not_default_status_str = {
             True: self._impr(Literal[True]),
             False: self._impr(Literal[False]),
             None: "bool",
         }[raise_if_not_default_status]
-        code = "*,\n"
+        # The keyword-only `*` is normally emitted here, but is hoisted to right after
+        # `self` when the caller already placed it (see `kwonly_args`).
+        code = "" if omit_delimiter else "*,\n"
         code += f"raise_if_not_default_status: {raise_if_not_default_status_str}"
         if (
             raise_if_not_default_status is None
