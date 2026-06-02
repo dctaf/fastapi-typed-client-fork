@@ -45,6 +45,7 @@ def generate_fastapi_typed_client(
     import_barrier: str | Iterable[str] | None = None,
     import_client_base: bool = False,
     raise_if_not_default_status: bool = False,
+    include_security_params: bool = True,
     _add_test_markers: bool = False,
 ) -> None:
     app = (
@@ -75,7 +76,7 @@ def generate_fastapi_typed_client(
     elif isinstance(import_barrier, str):
         import_barrier = [import_barrier]
 
-    routes = parse_routes(app.routes)
+    routes = parse_routes(app.routes, include_security_params=include_security_params)
     code = ClientCodeGenerator(
         title,
         async_,
