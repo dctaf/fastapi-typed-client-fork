@@ -102,19 +102,23 @@ class Route(NamedTuple):
     streaming_kind: RouteStreamingKind | None = None
 
 
-def parse_routes(routes: Sequence[BaseRoute]) -> Sequence[Route]:
+def parse_routes(
+    routes: Sequence[BaseRoute], *, include_security_params: bool = True
+) -> Sequence[Route]:
     result = list[Route]()
     for route, route_context in _iter_routes_with_context(routes):
         api_route = _get_api_route_for_openapi(route, route_context)
         if api_route is not None:
-            result.append(_parse_route(api_route))
+            result.append(
+                _parse_route(api_route, include_security_params=include_security_params)
+            )
     if not result:
         raise RuntimeError("Does not have any routes.")
     _check_duplicate_names(result)
     return result
 
 
-def _parse_route(route: _APIRouteLike) -> Route:
+def _parse_route(route: _APIRouteLike, *, include_security_params: bool = True) -> Route:
     if not route.name.isidentifier():
         raise RuntimeError(
             f"Route name `{route.name}` is not a valid Python identifier."
@@ -133,7 +137,9 @@ def _parse_route(route: _APIRouteLike) -> Route:
     return_annotation = get_typed_return_annotation(route.endpoint)
     streaming_kind = _detect_streaming_kind(route, return_annotation)
 
-    params, is_body_embedded = _parse_params(route)
+    params, is_body_embedded = _parse_params(
+        route, include_security_params=include_security_params
+    )
     responses, default_status = _parse_responses(
         route,
         has_params=bool(params),
@@ -203,7 +209,9 @@ def _unwrap_iterable(type_: Any) -> Any:  # noqa: ANN401
     return None
 
 
-def _parse_params(route: _APIRouteLike) -> tuple[Sequence[RouteParam], bool]:
+def _parse_params(
+    route: _APIRouteLike, *, include_security_params: bool = True
+) -> tuple[Sequence[RouteParam], bool]:
     incompatible_names = set[str]()
     seen_names = set[str]()
     disallowed_names = set[str]()
@@ -227,7 +235,9 @@ def _parse_params(route: _APIRouteLike) -> tuple[Sequence[RouteParam], bool]:
         kind: _fields_to_route_params(kind, fields, incompatible_names)
         for kind, fields in fields_params_map.items()
     }
-    route_params_map[RouteParamKind.SECURITY] = _parse_security_params(route, dependant)
+    route_params_map[RouteParamKind.SECURITY] = (
+        _parse_security_params(route, dependant) if include_security_params else ()
+    )
 
     if (
         route_params_map[RouteParamKind.FILE] or route_params_map[RouteParamKind.FORM]
