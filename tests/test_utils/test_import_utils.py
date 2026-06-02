@@ -1,7 +1,7 @@
 import collections.abc
 import json
 from collections.abc import Collection, Sequence
-from importlib import import_module
+from importlib import import_module, invalidate_caches
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Annotated, Any, Literal, Union
@@ -20,6 +20,7 @@ from fastapi_typed_client._utils import (
 def write_init_file(module_dir: Path, source: str = "") -> None:
     module_dir.mkdir(exist_ok=True)
     (module_dir / "__init__.py").write_text(source, encoding="utf-8")
+    invalidate_caches()
 
 
 pytestmark = [pytest.mark.usefixtures("tmp_import_path")]
