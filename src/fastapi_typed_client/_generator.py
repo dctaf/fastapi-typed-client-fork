@@ -8,7 +8,7 @@ from importlib.util import find_spec
 from inspect import getsource
 from sys import stdlib_module_names
 from types import NoneType
-from typing import Any, Literal, NamedTuple, get_args, get_origin, overload
+from typing import Any, Literal, NamedTuple, cast, get_args, get_origin, overload
 from warnings import warn
 
 from ._parser import (
@@ -150,17 +150,28 @@ class ClientCodeGenerator:
         ).generate(routes, self._import_client_base)
 
     def _get_route_code(self, route: Route) -> str:
+        # Wrap the dispatch in cast(...) to the implementation's declared return type
+        # instead of a blanket `# type: ignore`. The bare ignore doesn't suppress the
+        # "overloaded implementation cannot produce return type" error (reported on the
+        # def line) and trips `warn_unused_ignores` under strict mypy configs; casting the
+        # result keeps the generated client type-checker-clean for downstream consumers.
+        return_type = self._get_route_responses_code(
+            route.responses.values(), route.streaming_kind
+        )
         return self._get_route_signature_code(route) + indent(
-            f"return {'await ' if self._async else ''}self._route_handler(  # type: ignore\n"
-            f"    path={dq_str_repr(route.path)},\n"
-            f"    method={self._impr(HTTPMethod)}.{route.method.name},\n"
-            f"    default_status={self._impr(HTTPStatus)}.{route.default_status.name},\n"
-            + indent(self._get_models_dict_code(route.responses.values()))
-            + indent(self._get_params_dicts_code(route.params))
-            + indent(self._get_security_params_code(route.params))
-            + indent(self._get_optional_params_code(route))
-            + "    raise_if_not_default_status=raise_if_not_default_status,\n"
-            "    client_exts=client_exts,\n"
+            f"return {self._impr(cast)}(\n"
+            f"    {return_type},\n"
+            f"    {'await ' if self._async else ''}self._route_handler(\n"
+            f"        path={dq_str_repr(route.path)},\n"
+            f"        method={self._impr(HTTPMethod)}.{route.method.name},\n"
+            f"        default_status={self._impr(HTTPStatus)}.{route.default_status.name},\n"
+            + indent(indent(self._get_models_dict_code(route.responses.values())))
+            + indent(indent(self._get_params_dicts_code(route.params)))
+            + indent(indent(self._get_security_params_code(route.params)))
+            + indent(indent(self._get_optional_params_code(route)))
+            + "        raise_if_not_default_status=raise_if_not_default_status,\n"
+            "        client_exts=client_exts,\n"
+            "    ),\n"
             ")\n"
         )
 
@@ -173,7 +184,7 @@ class ClientCodeGenerator:
             f"{self._get_route_overload_signature_code(route, route.responses[route.default_status], True)}: ...\n"
             f"@{self._impr(overload)}\n"
             f"{self._get_route_overload_signature_code(route, route.responses.values(), False)}: ...\n"
-            f"{self._get_route_overload_signature_code(route, None, None)}:\n"
+            f"{self._get_route_overload_signature_code(route, route.responses.values(), None)}:\n"
         )
 
     def _get_route_overload_signature_code(
