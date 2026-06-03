@@ -80,7 +80,7 @@ wheels = [
 
 [[package]]
 name = "fastapi-typed-client"
-version = "0.3.0"
+version = "0.3.0+evid.2.up.g321354a"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
