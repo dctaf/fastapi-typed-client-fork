@@ -1,3 +1,7 @@
+> 💡 **Fork Notice**: This repository is a fork of [lschmelzeisen/fastapi-typed-client](https://github.com/lschmelzeisen/fastapi-typed-client). This fork was created to manage patches specific to Evidential's use cases.
+
+---
+
 # fastapi-typed-client
 
 [![PyPI](https://img.shields.io/pypi/v/fastapi-typed-client)](https://pypi.org/project/fastapi-typed-client/)
